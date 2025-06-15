@@ -1,16 +1,17 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
 import { signInWithEmailAndPassword } from 'firebase/auth';
+import { useAuth } from '@/context/AuthContext';
 import { auth } from '@/lib/FirebaseConfig';
 import { Form, Button, Alert } from 'react-bootstrap';
+
+import { redirect } from 'next/navigation';
 
 export default function LoginPage() {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [error, setError] = useState('');
-    const router = useRouter();
 
     const doLogin = async () => {
         setError('');
@@ -22,13 +23,25 @@ export default function LoginPage() {
             console.log("ログイン成功:", userCredential.user);
 
             // ログイン後の遷移（例：ホームへ）
-            router.push('/');
+            redirect('/');
         } catch (err: any) {
             console.error("ログインエラー:", err);
             setError(err.message);
         }
     };
 
+    const { user, loading } = useAuth();
+
+    if (loading) {
+        return (
+            <>
+                読み込み中
+            </>
+        )
+    }
+    if (user != null && !loading) {
+        redirect('/');
+    }
     return (
         <div style={{ maxWidth: 400, margin: '0 auto', paddingTop: 60 }}>
             <h2>ログイン</h2>

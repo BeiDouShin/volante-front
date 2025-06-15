@@ -2,11 +2,16 @@
 
 import { useState } from "react";
 import { Form, Button } from "react-bootstrap";
+import { useAuth } from '@/context/AuthContext';
 import { getAuth, createUserWithEmailAndPassword, User, deleteUser, UserInfo } from "firebase/auth";
 import { useForm } from "react-hook-form";
 import { yupResolver } from "@hookform/resolvers/yup";
 import * as Yup from "yup";
 import "@/lib/FirebaseConfig"; // 初期化だけであれば使われている前提
+import "@/app/components/apifetch";
+import { apiFetch } from "@/app/components/apifetch";
+
+import { redirect } from 'next/navigation';
 
 // export default function Register() {
 //     const [email, setEmail] = useState('');
@@ -71,12 +76,14 @@ import "@/lib/FirebaseConfig"; // 初期化だけであれば使われている�
 const schema = Yup.object().shape({
     email: Yup.string().email("正しいメールアドレスを入力してください").required("必須です"),
     password: Yup.string().min(8, "8文字以上で入力してください").required("必須です")
-    // .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).+$/, "大文字、小文字、数字を含めて入力してください"),
+        .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).+$/, "大文字、小文字、数字を含めて入力してください"),
+    displayName: Yup.string().min(4, "4文字以上で入力してください").required("必須です")
 });
 
 type FormData = {
     email: string;
     password: string;
+    displayName: string;
 };
 
 export default function RegisterForm() {
@@ -96,13 +103,25 @@ export default function RegisterForm() {
             .then((userCredential) => {
                 const user = userCredential.user;
                 console.log(user);
-                createUserBackend(user, data.email);
+                createUserBackend(user, data.email, data.displayName);
             })
             .catch((error) => {
                 alert(`登録失敗: ${error.message}`);
             });
     };
 
+    const { user, loading } = useAuth();
+
+    if (loading) {
+        return (
+            <>
+                読み込み中
+            </>
+        )
+    }
+    if (user != null && !loading) {
+        redirect('/');
+    }
     return (
         <div style={{ maxWidth: 400, margin: '0 auto' }}>
             <h2>新規登録</h2>
@@ -137,6 +156,21 @@ export default function RegisterForm() {
                     </Form.Control.Feedback>
                 </Form.Group>
 
+                <Form.Group className="mb-3">
+                    <Form.Label>
+                        表示名
+                        <span className="required">*</span>
+                    </Form.Label>
+                    <Form.Control
+                        type="text"
+                        {...register("displayName")}
+                        isInvalid={!!errors.displayName}
+                    />
+                    <Form.Control.Feedback type="invalid">
+                        {errors.password?.message}
+                    </Form.Control.Feedback>
+                </Form.Group>
+
                 <Button type="submit" variant="primary" style={{ width: "100%" }}>
                     登録
                 </Button>
@@ -144,21 +178,20 @@ export default function RegisterForm() {
         </div>
     );
 }
-async function createUserBackend(user: User, email: string) {
-    console.log(321123);
-
+async function createUserBackend(user: User, email: string, displayName: string) {
     let uid = user.uid;
-    let url: string = "http://127.0.0.1:3002/user/register";
-    const res = await fetch(url, {
-        method: "POST",
-        headers: {
-            "Content-Type": "application/json"
-        },
-        body: JSON.stringify({ uid, email })
-    });
-
-    if (!res.ok) {
+    let url: string = "http://localhost:8080/api/user";
+    try {
+        const data = await apiFetch(
+            url,
+            user,
+            {
+                method: "POST",
+                body: JSON.stringify({ uid, email, displayName })
+            }
+        )
+        return data;
+    } catch (err) {
         await deleteUser(user);
     }
-    const data = await res.json();
 }
